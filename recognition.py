@@ -229,6 +229,7 @@ class DigitRecognizer:
             if template_confident and (mlp_uncertain or t_pred != predicted_digit):
                 predicted_digit = t_pred
 
+
         # Heuristic nhỏ để tách nhầm 0/9:
         # cả 2 đều có thể có 1 "lỗ", nhưng lỗ của 9 thường nằm cao hơn 0.
         if predicted_digit in (0, 9):
