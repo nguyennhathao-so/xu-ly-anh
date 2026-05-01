@@ -185,13 +185,27 @@ Luồng hoạt động của mô hình được thiết kế theo chuẩn một 
 #### Chi tiết áp dụng AI/Machine Learning: Luồng Nhận dạng (Inference Workflow)
 Khi nhận dạng một chữ số cắt từ mã vạch thực tế, hệ thống không chỉ chạy 1 model mà dùng **Ensemble 3 tầng** để bảo đảm độ chính xác tối đa:
 
-```text
-Ảnh cắt rời → Rút trích Vector (439) ──→ [1. AI: Mạng Nơ-ron (MLP)] ───────┐
-                                                                          ├→ KẾT QUẢ CUỐI
-        ┌──(Nếu MLP thiếu tự tin)─────→ [2. AI: k-NN Fallback] ───────────┤
-        │                                                                 │
-        └──(Kiểm tra lại toàn diện)───→ [3. Template Matching (Cosine)] ──┘
-                                          + Heuristic phân biệt 0 và 9
+```mermaid
+graph TD
+    A[Ảnh cắt rời] --> B[Rút trích Vector 439 chiều]
+    B --> C[1. AI: Mạng Nơ-ron MLP]
+    B -. Kiểm tra song song .-> D[3. Template Matching]
+    
+    C --> E{MLP tự tin?}
+    E -- Có --> G[Kết quả tạm thời]
+    E -- Thiếu tự tin --> F[2. AI: k-NN Fallback]
+    
+    F --> G
+    D -- Ghi đè nếu độ tin cậy cao --> G
+    
+    G --> H[4. Heuristic phân biệt 0 và 9]
+    H --> I((KẾT QUẢ CUỐI CÙNG))
+
+    style C fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px
+    style F fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px
+    style D fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    style H fill:#fff3e0,stroke:#ff9800,stroke-width:2px
+    style I fill:#e8f5e9,stroke:#4caf50,stroke-width:3px
 ```
 
 1. **AI Cấp độ 1: Mạng nơ-ron đa tầng MLP (Multi-Layer Perceptron)** 
