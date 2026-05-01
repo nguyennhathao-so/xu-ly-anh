@@ -38,8 +38,8 @@ def preprocess_image(original_image):
     scale_factor = 3.0
     zoomed_roi = cv2.resize(number_roi, None, fx=scale_factor, fy=scale_factor, interpolation=cv2.INTER_CUBIC)
     
-    # 5. Cân bằng tương phản và Nhị phân hóa (Chương 2)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    # 5. Cân bằng tương phản và Nhị phân hóa (Chương 2) 
+    clahe = cv2.createCLAHE(clipLimit=0.95, tileGridSize=(8,8))
     contrast = clahe.apply(zoomed_roi)
     
     _, thresh_final = cv2.threshold(contrast, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)

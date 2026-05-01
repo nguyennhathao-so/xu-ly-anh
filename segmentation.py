@@ -245,7 +245,7 @@ def segment_digits(img_thresh):
     
     # 2. Vertical Projection (Chiếu dọc) - PASS 1: Lấy tất cả segments thô
     col_sums = np.sum(img_clean, axis=0)
-    gap_threshold = np.max(col_sums) * 0.05 if np.max(col_sums) > 0 else 1
+    gap_threshold = np.max(col_sums) * 0.035 if np.max(col_sums) > 0 else 1
     is_gap = col_sums <= gap_threshold
     
     raw_segments = []
@@ -277,7 +277,7 @@ def segment_digits(img_thresh):
         seg_region = img_clean[:, x_s:x_e]
 
         # Ký tự có lỗ (0/6/8/9) dễ bị split sai, ưu tiên giữ nguyên.
-        if seg_w > normal_avg_w * 1.55 and not has_inner_hole(seg_region):
+        if seg_w > normal_avg_w * 1.35 and not has_inner_hole(seg_region):
             # Segment này nghi ngờ là 2 số dính → tách
             parts = split_one_segment(x_s, x_e, img_clean)
             if len(parts) == 1:
