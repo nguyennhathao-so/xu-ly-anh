@@ -282,7 +282,8 @@ python main.py
 2. Bấm **"2. Chạy Bước 1 (Tiền xử lý)"** → xem ảnh nhị phân và thông tin phương pháp.
 3. Bấm **"3. Chạy Bước 3 (Cắt chữ)"** → xem từng ảnh chữ số được cắt rời.
 4. Bấm **"4. Nhận dạng số"** → xem kết quả chuỗi số cuối cùng.
-
+![Giao diện phần mềm](data/image%20for%20readmi/image2.png)
+*Minh họa giao diện ứng dụng chính*
 **Bước 3: Thu thập thêm dữ liệu mẫu (Tùy chọn)**
 Khi bạn cần bổ sung thêm dữ liệu ảnh thật cho mô hình AI, hãy chuyển hướng vào thư mục `data` và chạy script thu thập:
 ```bash
