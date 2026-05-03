@@ -1,4 +1,3 @@
-# xu-ly-anh
 # Hệ thống Nhận dạng Số dưới Mã vạch Vận chuyển (SPX/J&T)
 
 Dự án này xây dựng một pipeline **Computer Vision + Machine Learning** hoàn chỉnh, chạy hoàn toàn **local**, để nhận dạng dãy số nằm bên dưới mã vạch trên phiếu vận chuyển (SPX, J&T, v.v.) từ ảnh chụp điện thoại.
@@ -49,7 +48,7 @@ xu-ly-anh/
 ├── main.py                    # Ứng dụng GUI chính (Tkinter)
 ├── preprocessing.py           # Module tiền xử lý ảnh (Chương 2 & 3)
 ├── segmentation.py            # Module phân đoạn chữ số (Chương 2 & 4)
-├── recognition.py             # Module trích đặc trưng + nhận dạng (Chương 5)
+├── recognition.py             # Module trích đặc trưng + nhận dạng (Chương 2, 3 & 5)
 ├── visualize_ch5.py           # Script trực quan hóa đặc trưng Chương 5
 ├── requirements.txt
 └── data/
@@ -64,13 +63,13 @@ xu-ly-anh/
 
 ## 3. Luồng xử lý (Pipeline) từng bước
 
-Ứng dụng chính (`main.py`) chia quy trình thành **4 bước rõ ràng**, người dùng chủ động bấm nút từng bước:
+Ứng dụng chính (`main.py`) chia quy trình thành **3 bước rõ ràng**, người dùng chủ động bấm nút từng bước:
 
 ```mermaid
 graph TD
     A([Tải ảnh]) --> B[Bước 1: Tiền xử lý]
-    B --> C[Bước 3: Cắt chữ số]
-    C --> D[Bước 4: Nhận dạng]
+    B --> C[Bước 2: Cắt chữ số]
+    C --> D[Bước 3: Nhận dạng]
     D --> E([Kết quả hiển thị])
 
     subgraph "Tiền xử lý (Chương 2 & 3)"
@@ -87,10 +86,11 @@ graph TD
     end
     C -.-> C1
 
-    subgraph "Nhận dạng (Chương 5)"
-        D1[Chuẩn hóa kích thước] --> D2[Trích xuất 439 đặc trưng]
-        D2 --> D3{Ensemble 3 mô hình}
-        D3 -->|MLP / k-NN / Template| D4[Xử lý phân biệt 0 và 9]
+    subgraph "Nhận dạng (Chương 2, 3 & 5)"
+        D1[Chuẩn hóa kích thước] --> D2[Augmentation: Translation + Dilation + Erosion]
+        D2 --> D3[Trích xuất 439 đặc trưng]
+        D3 --> D4{Ensemble 3 mô hình}
+        D4 -->|MLP / k-NN / Template| D5[Xử lý phân biệt 0 và 9]
     end
     D -.-> D1
     
@@ -109,7 +109,7 @@ graph TD
 | 1 | Chuyển xám | `cv2.cvtColor(BGR → GRAY)` |
 | 2 | Ngưỡng nhị phân đơn giản | Threshold 200 + `THRESH_BINARY_INV` để tìm vùng nội dung |
 | 3 | Crop lề thừa | `findNonZero` + `boundingRect` để loại bỏ viền trắng xung quanh |
-| 4 | **Chiếu ngang (Horizontal Projection)** | Tính tổng pixel theo từng hàng (`np.sum(axis=1)`), tìm hàng có ít mực nhất trong vùng 50–95% chiều cao để xác định ranh giới mã vạch và dãy số |
+| 4 | **Chiếu ngang (Horizontal Projection — Chương 4)** | Tính tổng pixel theo từng hàng (`np.sum(axis=1)`), tìm hàng có ít mực nhất trong vùng 50–95% chiều cao để xác định ranh giới mã vạch và dãy số |
 | 5 | **Biến đổi hình học (Chương 3)** | Phóng to ROI số lên **3× (Bicubic interpolation)** — `cv2.resize(..., interpolation=INTER_CUBIC)` |
 | 6 | **Cân bằng tương phản** | `CLAHE` (`clipLimit=0.95`, `tileGridSize=(8,8)`) |
 | 7 | **Nhị phân hóa Otsu** | `THRESH_BINARY_INV + THRESH_OTSU` — tự động chọn ngưỡng tốt nhất |
@@ -118,48 +118,48 @@ graph TD
 
 ---
 
-### Bước 3 – Phân đoạn chữ số (`segmentation.py`)
+### Bước 2 – Phân đoạn chữ số (`segmentation.py`)
 
 **Áp dụng kiến thức Chương 2 và Chương 4:**
-- **Chương 2 (Hình thái học - Morphology):** Được sử dụng ở bước **3a** (Morphological Closing) để nối nét đứt gãy, và bước **3e** (Erosion trong `split_by_morph_fallback`) để hỗ trợ tách các chữ số bị dính liền.
-- **Chương 4 (Phân đoạn ảnh - Image Segmentation):** Được sử dụng ở bước **3d** và **3e** thông qua kỹ thuật **Vertical Projection** (chiếu dọc) để tìm các khoảng trống (gap/valley) nhằm cắt rời từng chữ số.
+- **Chương 2 (Hình thái học - Morphology):** Được sử dụng ở bước **2a** (Morphological Closing) để nối nét đứt gãy, và bước **2e** (Erosion trong `split_by_morph_fallback`) để hỗ trợ tách các chữ số bị dính liền.
+- **Chương 4 (Phân đoạn ảnh - Image Segmentation):** Được sử dụng ở bước **2d** và **2e** thông qua kỹ thuật **Vertical Projection** (chiếu dọc) để tìm các khoảng trống (gap/valley) nhằm cắt rời từng chữ số.
 
 Pipeline gồm nhiều pass liên tiếp:
 
-#### 3a. Morphological Closing (Ứng dụng Chương 2)
+#### 2a. Morphological Closing (Ứng dụng Chương 2)
 - Kernel `2×2` để nối các nét đứt gãy nhỏ bên trong chữ số mà không làm dính 2 chữ liền nhau.
 
-#### 3b. Lọc nhiễu vạch mã vạch còn sót (`remove_barcode_bar_artifacts`)
+#### 2b. Lọc nhiễu vạch mã vạch còn sót (`remove_barcode_bar_artifacts`)
 - Dùng **Connected Components** (`connectedComponentsWithStats`) để tìm các blob.
 - Loại bỏ blob có `aspect_ratio ≥ 5.5` (rất cao so với rộng) AND bám vào 10% phía trên ảnh — đây là đặc trưng của vạch barcode sót.
 
-#### 3c. Xác định dải chữ số chính (`keep_main_digit_band`)
-- Tính **Horizontal Projection** → tìm các "band" liên tục có mực.
+#### 2c. Xác định dải chữ số chính (`keep_main_digit_band`)
+- Tính **Horizontal Projection** (Chương 4) → tìm các "band" liên tục có mực.
 - Chọn band có score cao nhất (kết hợp lượng mực + độ dày + thiên về vùng thấp) để giữ lại dãy số, bỏ đốm/vệt ở phía trên.
 
-#### 3d. Vertical Projection – PASS 1 (Ứng dụng Chương 4)
+#### 2d. Vertical Projection – PASS 1 (Ứng dụng Chương 4)
 - Tính tổng pixel theo từng cột (`np.sum(axis=0)`).
 - Ngưỡng gap = 3.5% của cột có mực nhiều nhất.
 - Xác định các **segment** (đoạn có chữ).
 - Lọc segment quá mảnh (< 20% độ rộng trung bình).
 
-#### 3e. Tách chữ số dính – PASS 2 (Ứng dụng kết hợp Chương 4 và Chương 2)
+#### 2e. Tách chữ số dính – PASS 2 (Ứng dụng kết hợp Chương 4 và Chương 2)
 - Với mỗi segment nghi là 2 chữ dính (rộng hơn 1.35× trung bình AND không có lỗ bên trong):
   - **Thử 1 (Chương 4):** `split_one_segment` — áp dụng lại Vertical Projection nội bộ, tìm valley nhỏ nhất trong vùng 20–80% chiều rộng, chỉ cắt nếu valley < 30% max.
   - **Thử 2 Fallback (Chương 2):** `split_by_morph_fallback` — erode nhẹ `(1×2)` rồi dùng Connected Components, chỉ chấp nhận nếu tách ra đúng 2 phần hợp lệ.
 - Ký tự có lỗ (0, 6, 8, 9) được phát hiện bởi `has_inner_hole` (dùng `RETR_CCOMP`) → **ưu tiên giữ nguyên**, tránh tách nhầm.
 
-#### 3f. Lọc bbox nhiễu
+#### 2f. Lọc bbox nhiễu
 - Lọc box quá hẹp, `fill_ratio > 70%` (vạch dọc), và **"flat vertical stroke"** — profile mực theo hàng quá đều (CV < 0.22) với fill cao → chính là vạch barcode.
 
-#### 3g. Pass hoàn thiện (`refine_wide_boxes_iterative`)
-- Lặp tối đa 3 vòng để tách tiếp các box còn rộng hơn 1.42× trung bình (tiếp tục sử dụng lại logic của bước 3e).
+#### 2g. Pass hoàn thiện (`refine_wide_boxes_iterative`)
+- Lặp tối đa 3 vòng để tách tiếp các box còn rộng hơn 1.42× trung bình (tiếp tục sử dụng lại logic của bước 2e).
 
 **Đầu ra:** Danh sách ảnh chữ số riêng lẻ đã crop (thêm padding 2px).
 
 ---
 
-### Bước 4 – Nhận dạng chữ số (`recognition.py`)
+### Bước 3 – Nhận dạng chữ số (`recognition.py`)
 
 **Sự kết hợp giữa lý thuyết Chương 5 và Trí tuệ nhân tạo (AI - Machine Learning) được áp dụng tại đây.** 
 Luồng hoạt động của mô hình được thiết kế theo chuẩn một quy trình Machine Learning hoàn chỉnh: từ chuẩn bị dữ liệu, trích xuất đặc trưng (Chương 5), huấn luyện, cho đến kết hợp mô hình (Ensemble) để dự đoán.
@@ -167,7 +167,12 @@ Luồng hoạt động của mô hình được thiết kế theo chuẩn một 
 #### Luồng hoạt động tạo và huấn luyện mô hình (Training Workflow)
 1. **Thu thập và Sinh mẫu (Synthetic Data):** Nếu bộ template thật không đủ 10 lớp chữ số, hệ thống tự động sinh ảnh chữ số nhân tạo bằng font `FONT_HERSHEY_SIMPLEX` (`scale=1.6`, `thickness=3`) để đảm bảo tính cân bằng dữ liệu.
 2. **Chuẩn hóa ảnh đầu vào:** Mỗi ảnh mẫu được resize về đúng `50×50` (giữ nguyên tỷ lệ) và căn giữa trên nền đen/trắng tiêu chuẩn để khử nhiễu kích thước và vị trí.
-3. **Data Augmentation (Tăng cường dữ liệu):** Từ một mẫu ban đầu, hệ thống nhân bản thành **7 biến thể** (dịch trái/phải/trên/dưới ±1px, dilate, erode). Việc này giúp AI tổng quát hóa tốt hơn, tránh học vẹt (overfitting).
+3. **Data Augmentation (Tăng cường dữ liệu — Áp dụng Chương 2 & 3):** Từ một mẫu ban đầu, hệ thống nhân bản thành **7 biến thể** bằng cách kết hợp:
+   - **Phép tịnh tiến (Translation — Chương 3):** Dịch chuyển ảnh trái/phải/trên/dưới ±1px bằng `cv2.warpAffine` (ma trận dịch chuyển Affine đơn giản nhất).
+   - **Phép giãn (Dilation — Chương 2):** `cv2.dilate` mô phỏng chữ đậm hơn (mực loang nhẹ).
+   - **Phép co (Erosion — Chương 2):** `cv2.erode` mô phỏng chữ mảnh hơn (mực phai nhạt).
+   
+   Việc này giúp AI tổng quát hóa tốt hơn với các biến thể font in nhiệt thực tế, tránh học vẹt (overfitting).
 4. **Trích xuất đặc trưng (Feature Extraction - Áp dụng Chương 5):** Biến đổi ảnh ma trận pixel thô thành các vector đặc trưng toán học biểu diễn hình dạng đối tượng.
 5. **Huấn luyện:** Các vector 439 chiều này (sau khi chuẩn hóa Z-score) sẽ được đưa vào huấn luyện mạng nơ-ron (MLP) và lập không gian mẫu cho thuật toán láng giềng gần nhất (k-NN).
 
@@ -185,46 +190,32 @@ Luồng hoạt động của mô hình được thiết kế theo chuẩn một 
 #### Chi tiết áp dụng AI/Machine Learning: Luồng Nhận dạng (Inference Workflow)
 Khi nhận dạng một chữ số cắt từ mã vạch thực tế, hệ thống không chỉ chạy 1 model mà dùng **Ensemble 3 tầng** để bảo đảm độ chính xác tối đa:
 
-```mermaid
-graph TD
-    A[Ảnh cắt rời] --> B[Rút trích Vector 439 chiều]
-    B --> C[1. AI: Mạng Nơ-ron MLP]
-    B -. Kiểm tra song song .-> D[3. Template Matching]
-    
-    C --> E{MLP tự tin?}
-    E -- Có --> G[Kết quả tạm thời]
-    E -- Thiếu tự tin --> F[2. AI: k-NN Fallback]
-    
-    F --> G
-    D -- Ghi đè nếu độ tin cậy cao --> G
-    
-    G --> H[4. Heuristic phân biệt 0 và 9]
-    H --> I((KẾT QUẢ CUỐI CÙNG))
+Ảnh minh họa luồng nhận dạng:
+![alt text](/data/image%20for%20readmi/image.png)
+*Minh họa hoạt động của hệ thống nhận dạng chữ số 3 tầng*
 
-    style C fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px
-    style F fill:#e1f5fe,stroke:#03a9f4,stroke-width:2px
-    style D fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    style H fill:#fff3e0,stroke:#ff9800,stroke-width:2px
-    style I fill:#e8f5e9,stroke:#4caf50,stroke-width:3px
-```
+**Giải thích các cơ chế rẽ nhánh trên sơ đồ:**
+- **[Tự tin cao]:** Xảy ra khi Mạng nơ-ron (MLP) chắc chắn với dự đoán của mình (khoảng cách xác suất giữa kết quả top 1 và top 2 rất lớn, `margin >= 0.20`). Hệ thống sẽ tin tưởng tuyệt đối và lấy ngay kết quả này làm dự đoán tạm thời.
+- **[Thiếu tự tin]:** Xảy ra khi chữ số bị mờ, đứt nét hoặc dính nhiễu (ví dụ số 5 trông hơi giống số 6), MLP không thể đưa ra quyết định dứt khoát (`margin < 0.20`). Thay vì đoán bừa, hệ thống tự động rẽ nhánh sang gọi thuật toán k-NN để tìm kiếm các láng giềng gần nhất làm "phương án dự phòng" (Fallback).
+- **[Ghi đè nếu độ tin cậy cao]:** Kỹ thuật Template Matching (so khớp mẫu trực tiếp) được chạy song song độc lập như một "lưới an toàn". Nếu nó tìm thấy một mẫu khớp cực kỳ hoàn hảo (`score >= 0.72`) nhưng kết quả này lại khác với dự đoán tạm thời của 2 AI trên, hệ thống sẽ ưu tiên tính chính xác cơ học và cho phép Template Matching **ghi đè (override)** hoàn toàn dự đoán của AI.
 
-1. **AI Cấp độ 1: Mạng nơ-ron đa tầng MLP (Multi-Layer Perceptron)** 
-   - Hàm API: `cv2.ml.ANN_MLP`
-   - Kiến trúc ẩn: `[Input: 439 → Hidden 1: 256 → Hidden 2: 128 → Output: 10 (lớp 0-9)]`.
-   - Thuật toán: Backpropagation (`lr=0.01`, `momentum=0.1`, `max_iter=2000`), hàm kích hoạt `SIGMOID_SYM`.
-   - Nhiệm vụ: Đóng vai trò là bộ não dự đoán chính. Mô hình trả về kết quả dự đoán kèm "độ tự tin" (margin - chênh lệch xác suất lớp cao nhất và thứ hai).
+*Để dễ nắm bắt, hệ thống này hoạt động giống như một "Hội đồng 4 giám khảo" phối hợp với nhau để không bao giờ nhận diện sai:*
 
-2. **AI Cấp độ 2: Thuật toán Láng giềng k-NN (`cv2.ml.KNearest`)**
-   - Chỉ được gọi làm dự phòng (Fallback) khi mạng nơ-ron MLP "không chắc chắn" (margin < 0.20 hoặc top1_score < 0.25).
-   - Nếu trong $k=5$ láng giềng gần nhất (so sánh trong không gian 439 chiều) có $\ge 3$ phiếu bầu đồng thuận, AI sẽ chốt dùng kết quả của k-NN thay thế cho MLP.
+1. **Giám khảo chính: Mạng nơ-ron đa tầng MLP (Multi-Layer Perceptron)** 
+   - **Mô tả dễ hiểu:** Đây là bộ não AI chính. Nó nhìn vào 439 đặc điểm của bức ảnh và đưa ra lựa chọn đầu tiên kèm theo độ tự tin (Ví dụ: "90% là số 8, 10% là số 3").
+   - **Chi tiết kỹ thuật:** Dùng `cv2.ml.ANN_MLP` với kiến trúc ẩn `[Input: 439 → Hidden 1: 256 → Hidden 2: 128 → Output: 10]`. Huấn luyện bằng Backpropagation (`lr=0.01`, `momentum=0.1`, `max_iter=2000`), hàm kích hoạt `SIGMOID_SYM`. Nhiệm vụ chính là trả về dự đoán kèm chênh lệch xác suất (margin).
 
-3. **Lưới an toàn Cấp độ 3: Template Matching (Cosine Similarity)**
-   - Là thuật toán thuần toán học để so sánh trực tiếp vector đặc trưng của ảnh đang xét với các mẫu thật trong `data/digit_templates/`.
-   - Nếu độ tương đồng `template_score ≥ 0.72` và độ phân tách tốt (`margin ≥ 0.04`), kết quả này có quyền cao nhất để ghi đè mọi quyết định sai lầm của 2 AI trên.
+2. **Chuyên gia tra cứu: Thuật toán Láng giềng k-NN (`cv2.ml.KNearest`)**
+   - **Mô tả dễ hiểu:** Giám khảo này chỉ làm việc khi MLP lúng túng (nhìn nét mờ không rõ). Nó cầm ảnh chạy thẳng vào thư viện tìm 5 mẫu thật giống nhất. Nếu 3/5 mẫu đó là số "5", nó chốt luôn kết quả theo số đông.
+   - **Chi tiết kỹ thuật:** Đóng vai trò dự phòng (Fallback) khi MLP "thiếu tự tin" (`margin < 0.20` hoặc `top1_score < 0.25`). Nếu trong $k=5$ láng giềng gần nhất có $\ge 3$ phiếu bầu đồng thuận, hệ thống sẽ lấy kết quả k-NN thay thế cho MLP.
 
-4. **Heuristic phân tích cấu trúc (Sửa lỗi phân biệt 0 và 9)**
-   - Hai số này rất dễ nhầm do cùng có vòng tròn kín (lỗ). Hệ thống dùng `cv2.moments` tìm tâm khối của lỗ bên trong (`_refine_zero_nine`).
-   - Nếu `hole_y < 0.45` (trọng tâm lỗ nằm ở nửa trên chữ số) → chắc chắn là chữ **9**. Ngược lại lỗ ở giữa/dưới → chữ **0**.
+3. **Máy đo rập khuôn: Lưới an toàn Template Matching (Cosine Similarity)**
+   - **Mô tả dễ hiểu:** Đây không phải AI mà là thước đo rập khuôn. Nếu nó "đặt đè" ảnh hiện tại lên ảnh mẫu chuẩn mà thấy khớp hoàn hảo một cách tuyệt đối, nó có **quyền phủ quyết** (ghi đè) quyết định sai lầm của 2 AI phía trên để tránh ảo giác AI.
+   - **Chi tiết kỹ thuật:** Thuật toán toán học để so sánh trực tiếp vector đặc trưng với các mẫu thật trong `data/digit_templates/`. Nếu `template_score ≥ 0.72` và độ phân tách tốt (`margin ≥ 0.04`), nó sẽ ghi đè kết quả tạm thời.
+
+4. **Mẹo thủ công con người: Heuristic phân tích cấu trúc (Sửa lỗi 0 và 9)**
+   - **Mô tả dễ hiểu:** AI thỉnh thoảng vẫn nhầm số 0 và số 9 vì cả hai đều có vòng tròn kín. Ta cài thêm 1 cái mẹo: Đi tìm vòng tròn (cái lỗ). Nếu lỗ nằm tuốt ở nửa trên (tức là có cái đuôi dài ở dưới) → là số 9. Lỗ nằm giữa → là số 0.
+   - **Chi tiết kỹ thuật:** Dùng `cv2.moments` đếm contour để tính tâm khối của lỗ bên trong (`_refine_zero_nine`). Nếu trọng tâm trục Y của lỗ (`hole_y`) `< 0.45` thì chốt là chữ **9**, ngược lại là chữ **0**.
 
 ---
 
@@ -234,10 +225,12 @@ Giao diện **Tkinter** với **Canvas cuộn dọc** (mouse wheel), chia thành
 
 | Vùng | Nội dung |
 |---|---|
-| Thanh nút | 4 nút bấm theo thứ tự: Tải ảnh → Bước 1 → Bước 3 → Nhận dạng |
+| Thanh nút | 4 nút bấm theo thứ tự: Tải ảnh → Bước 1 (Tiền xử lý) → Bước 2 (Cắt chữ) → Bước 3 (Nhận dạng) |
 | Khung đôi | Ảnh gốc (trái) và ảnh sau Bước 1 (phải, kèm thông tin phương pháp) |
 | Dải chữ số | Canvas cuộn ngang hiển thị từng ảnh chữ số đã cắt (height=50px cố định) |
 | Kết quả | Panel tối (`#1a1a2e`) hiển thị chuỗi số bằng font Courier New 26pt màu cyan |
+![Giao diện phần mềm](data/image%20for%20readmi/image1.png)
+*Minh họa giao diện ứng dụng chính*
 
 ---
 
@@ -246,6 +239,7 @@ Giao diện **Tkinter** với **Canvas cuộn dọc** (mouse wheel), chia thành
 Giao diện Tkinter riêng biệt để xây dựng bộ mẫu thật:
 
 1. Tải ảnh mã vạch → tự động chạy `preprocess_image` + `segment_digits`.
+
 2. Hiển thị các ảnh chữ số đã cắt.
 3. Người dùng nhập chuỗi nhãn tương ứng (ví dụ: `8163456789013`).
 4. Lưu từng ảnh vào `data/digit_templates/` với tên `digit_<số>_<timestamp>_<idx>.png`.
@@ -271,52 +265,40 @@ Hiển thị 3 biểu đồ song song:
 
 ---
 
-## 7. Cài đặt môi trường
+## 7. Cài đặt và Chạy ứng dụng
 
 **Yêu cầu:** Python 3.10+ (khuyến nghị 3.10 hoặc 3.11)
 
+**Bước 1: Cài đặt thư viện**
+Bạn chỉ cần tải các thư viện bắt buộc trong file `requirements.txt` bằng lệnh `pip`:
 ```bash
-python -m venv .venv
-
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-
 pip install -r requirements.txt
 
-# Nếu cần visualize_ch5.py
+# Nếu cần chạy script visualize_ch5.py để xem biểu đồ:
 pip install matplotlib
 ```
 
-**`requirements.txt`:**
-```
-opencv-python
-numpy
-Pillow
-```
-
----
-
-## 8. Cách chạy
-
-### Ứng dụng chính
+**Bước 2: Chạy ứng dụng chính**
+Sau khi cài đặt xong thư viện, bạn không cần thiết lập venv phức tạp, có thể chạy trực tiếp file `main.py` để mở phần mềm:
 ```bash
 python main.py
 ```
-Quy trình sử dụng:
+*Quy trình sử dụng trên giao diện:*
 1. Bấm **"1. Tải ảnh"** → chọn file ảnh mã vạch.
 2. Bấm **"2. Chạy Bước 1 (Tiền xử lý)"** → xem ảnh nhị phân và thông tin phương pháp.
-3. Bấm **"3. Chạy Bước 3 (Cắt chữ)"** → xem từng ảnh chữ số được cắt rời.
+3. Bấm **"3. Chạy Bước 2 (Cắt chữ)"** → xem từng ảnh chữ số được cắt rời.
 4. Bấm **"4. Nhận dạng số"** → xem kết quả chuỗi số cuối cùng.
+![Giao diện phần mềm](data/image%20for%20readmi/image2.png)
+*Minh họa giao diện ứng dụng chính*
 
-### Thu thập dữ liệu mẫu
+**Bước 3: Thu thập thêm dữ liệu mẫu (Tùy chọn)**
+Khi bạn cần bổ sung thêm dữ liệu ảnh thật cho mô hình AI, hãy chuyển hướng vào thư mục `data` và chạy script thu thập:
 ```bash
-python data/collect_samples.py
+cd data
+python collect_samples.py
 ```
 
-### Trực quan hóa đặc trưng
-```bash
-python visualize_ch5.py
-```
+*(Nội dung file `requirements.txt` bao gồm: `opencv-python`, `numpy`, `Pillow`)*
 
 ---
 
@@ -324,10 +306,10 @@ python visualize_ch5.py
 
 | Chương | Kỹ thuật áp dụng | File |
 |---|---|---|
-| **Chương 2** | Chuyển xám, CLAHE, Otsu threshold, Morphological Closing, Erosion, Dilation, Connected Components | `preprocessing.py`, `segmentation.py` |
-| **Chương 3** | Scale/Zoom 3× Bicubic, Crop ROI (tương đương deskew hình học) | `preprocessing.py` |
-| **Chương 4** | Horizontal Projection, Vertical Projection, Connected Components labeling, Bounding Box, Valley splitting | `segmentation.py` |
-| **Chương 5** | Hu Moments, Fourier Descriptors, Pixel Zoning, kNN, MLP (ANN Backprop), Template Matching (Cosine Similarity), Data Augmentation | `recognition.py`, `visualize_ch5.py` |
+| **Chương 2** | Chuyển xám, CLAHE, Otsu threshold, Morphological Closing (nối nét đứt), Erosion (tách chữ dính + augmentation), Dilation (augmentation), Connected Components | `preprocessing.py`, `segmentation.py`, `recognition.py` |
+| **Chương 3** | Scale/Zoom 3× Bicubic (`INTER_CUBIC`), Translation — `warpAffine` dịch ±1px (Data Augmentation) | `preprocessing.py`, `recognition.py` |
+| **Chương 4** | Horizontal Projection (`np.sum(axis=1)`), Vertical Projection (`np.sum(axis=0)`), Valley finding (`np.argmin`), Bounding Box | `preprocessing.py`, `segmentation.py` |
+| **Chương 5** | Hu Moments (`cv2.HuMoments`), Fourier Descriptors (FFT 32 hệ số), Pixel Zoning (20×20=400D), k-NN (`cv2.ml.KNearest`), MLP (`cv2.ml.ANN_MLP`, Backprop), Template Matching (Cosine Similarity) | `recognition.py`, `visualize_ch5.py` |
 
 ---
 
